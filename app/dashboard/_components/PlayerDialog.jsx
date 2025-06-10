@@ -13,6 +13,7 @@ import { db } from "@/configs/db";
 import { VideoData } from "@/configs/schema";
 import { eq } from "drizzle-orm";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 function PlayerDialog({ playVideo, videoId }) {
   const [openDialog, setOpenDialog] = useState(false);
@@ -46,10 +47,16 @@ function PlayerDialog({ playVideo, videoId }) {
       setLoadingExport(true);
       setExportError(null);
 
-      const response = await fetch("http://localhost:4000/export-video", {
+      const payload = {
+        imageList: videoData?.imageList ?? [],
+        audioFileUrl: videoData?.audioFileUrl,
+        script: videoData?.script,
+      };
+      // /api/export-video
+      const response = await fetch("https://ai-vision-craft-generator.onrender.com/api/export-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(videoData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -63,12 +70,18 @@ function PlayerDialog({ playVideo, videoId }) {
         throw new Error(data?.error || "Unknown export error");
       }
 
+      const blob = await (await fetch(data.result)).blob();
+      const url = window.URL.createObjectURL(blob);
+
       const link = document.createElement("a");
-      link.href = data.result;
+      link.href = url;
       link.download = `video-${videoId}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      window.URL.revokeObjectURL(url);
+      toast.success("Video exported successfully!");
     } catch (error) {
       console.error("Export failed:", error);
       setExportError(error.message || "Export failed");
