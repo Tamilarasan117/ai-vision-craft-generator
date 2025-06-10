@@ -1,9 +1,6 @@
-import { storage } from "@/configs/FirebaseConfig";
-import textToSpeech from "@google-cloud/text-to-speech";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { NextResponse } from "next/server";
-const fs = require("fs");
-const util = require("util");
+import textToSpeech from "@google-cloud/text-to-speech";
+import cloudinary from "@/configs/CloudinaryConfig";
 
 const client = new textToSpeech.TextToSpeechClient({
   apiKey: process.env.GOOGLE_API_KEY,
@@ -12,21 +9,34 @@ const client = new textToSpeech.TextToSpeechClient({
 export async function POST(req) {
   const { text, id } = await req.json();
 
-  const storageRef = ref(storage, "ai-short-video-files/" + id + ".mp3");
-
   const request = {
-    input: { text: text },
+    input: { text },
     voice: { languageCode: "en-US", ssmlGender: "FEMALE" },
     audioConfig: { audioEncoding: "MP3" },
   };
 
-  const [response] = await client.synthesizeSpeech(request);
+  try {
+    const [response] = await client.synthesizeSpeech(request);
+    const audioBuffer = Buffer.from(response.audioContent, "binary");
 
-  const audioBuffer = Buffer.from(response.audioContent, "binary");
+    const uploadResponse = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        {
+          resource_type: "video",
+          public_id: `ai-short-video-files/${id}`,
+          folder: "ai-short-video-files",
+          format: "mp3",
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      ).end(audioBuffer);
+    });
 
-  await uploadBytes(storageRef, audioBuffer, { contentType: "audio/mp3" });
-
-  const downloadUrl = await getDownloadURL(storageRef);
-  console.log(downloadUrl);
-  return NextResponse.json({ result: downloadUrl });
+    return NextResponse.json({ result: uploadResponse.secure_url });
+  } catch (error) {
+    console.error("Cloudinary upload error:", error);
+    return NextResponse.json({ error: "Audio generation/upload failed" }, { status: 500 });
+  }
 }
