@@ -1,5 +1,14 @@
+let Razorpay;
+if (process.env.NODE_ENV !== 'production') {
+  Razorpay = require("razorpay");
+}
+
 import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
+
+if (!Razorpay) {
+  return NextResponse.json({ error: "Razorpay not available in production" }, { status: 500 });
+}
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
