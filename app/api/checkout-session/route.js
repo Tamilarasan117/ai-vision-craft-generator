@@ -1,21 +1,25 @@
-let Razorpay;
-if (process.env.NODE_ENV !== 'production') {
-  Razorpay = require("razorpay");
-}
-
+// app/api/checkout-session/route.js
 import { NextResponse } from "next/server";
-import Razorpay from "razorpay";
 
-if (!Razorpay) {
-  return NextResponse.json({ error: "Razorpay not available in production" }, { status: 500 });
+let razorpay = null;
+
+if (process.env.NODE_ENV !== "production") {
+  const { default: Razorpay } = await import("razorpay");
+
+  razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_SECRET,
+  });
 }
-
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_SECRET,
-});
 
 export async function POST(req) {
+  if (!razorpay) {
+    return NextResponse.json(
+      { error: "Razorpay not available in production" },
+      { status: 500 }
+    );
+  }
+
   try {
     const amount = 499 * 100;
 
@@ -33,7 +37,7 @@ export async function POST(req) {
       currency: order.currency,
     });
   } catch (error) {
-    console.log(error);
-    return NextResponse.error();
+    console.error("Razorpay error:", error);
+    return NextResponse.json({ error: "Order creation failed" }, { status: 500 });
   }
 }
