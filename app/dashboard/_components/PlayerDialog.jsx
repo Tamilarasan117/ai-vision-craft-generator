@@ -52,8 +52,8 @@ function PlayerDialog({ playVideo, videoId }) {
         audioFileUrl: videoData?.audioFileUrl,
         script: videoData?.script,
       };
-      // /api/export-video
-      const response = await fetch("https://ai-vision-craft-generator.onrender.com/api/export-video", {
+      // https://ai-vision-craft-generator.onrender.com/api/export-video 
+      const response = await fetch("/api/export-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
