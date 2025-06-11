@@ -47,12 +47,22 @@ function PlayerDialog({ playVideo, videoId }) {
       setLoadingExport(true);
       setExportError(null);
 
-      const payload = {
-        imageList: videoData?.imageList ?? [],
-        audioFileUrl: videoData?.audioFileUrl,
-        script: videoData?.script,
+      const makeAbsoluteUrl = (url) => {
+        if (!url) return "";
+        try {
+          return new URL(url, window.location.origin).href;
+        } catch {
+          console.warn("Invalid URL:", url);
+          return url;
+        }
       };
-      // https://ai-vision-craft-generator.onrender.com/api/export-video 
+
+      const payload = {
+        imageList: (videoData?.imageList || []).map(makeAbsoluteUrl),
+        audioFileUrl: makeAbsoluteUrl(videoData?.audioFileUrl),
+        script: videoData?.script || [],
+      };
+
       const response = await fetch("/api/export-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,22 +75,36 @@ function PlayerDialog({ playVideo, videoId }) {
       }
 
       const data = await response.json();
+      const base64Data = data?.result;
 
-      if (!data?.result) {
-        throw new Error(data?.error || "Unknown export error");
+      if (!base64Data?.startsWith("data:video/mp4;base64,")) {
+        throw new Error("Invalid video data format received");
       }
 
-      const blob = await (await fetch(data.result)).blob();
+      const base64String = base64Data.split(",")[1];
+      const byteCharacters = atob(base64String);
+      const byteArrays = [];
+
+      for (let i = 0; i < byteCharacters.length; i += 1024) {
+        const slice = byteCharacters.slice(i, i + 1024);
+        const byteNumbers = new Array(slice.length);
+        for (let j = 0; j < slice.length; j++) {
+          byteNumbers[j] = slice.charCodeAt(j);
+        }
+        byteArrays.push(new Uint8Array(byteNumbers));
+      }
+
+      const blob = new Blob(byteArrays, { type: "video/mp4" });
       const url = window.URL.createObjectURL(blob);
 
       const link = document.createElement("a");
       link.href = url;
-      link.download = `video-${videoId}.mp4`;
+      link.download = `video-${videoData?.id || Date.now()}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
       window.URL.revokeObjectURL(url);
+
       toast.success("Video exported successfully!");
     } catch (error) {
       console.error("Export failed:", error);
