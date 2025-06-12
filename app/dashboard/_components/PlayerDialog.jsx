@@ -63,7 +63,15 @@ function PlayerDialog({ playVideo, videoId }) {
         script: videoData?.script || [],
       };
 
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      if (!process.env.NEXT_PUBLIC_API_URL && process.env.NODE_ENV !== "development") {
+        throw new Error("Missing NEXT_PUBLIC_API_URL in production");
+      }
+
+      const baseURL =
+        process.env.NODE_ENV === "development"
+          ? "http://localhost:4000"
+          : process.env.NEXT_PUBLIC_API_URL;
+
       const response = await fetch(`${baseURL}/export-video`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
