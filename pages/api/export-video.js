@@ -1,5 +1,3 @@
-//app/api/export-video/route.js
-import { NextRequest, NextResponse } from "next/server";
 import ffmpeg from "fluent-ffmpeg";
 import path from "path";
 import fs from "fs/promises";
@@ -7,7 +5,6 @@ import { v4 as uuidv4 } from "uuid";
 import fetch from "node-fetch";
 import os from "os";
 
-// ⛑️ Image/audio download helper
 async function downloadFile(url, destPath) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to download ${url}: ${res.statusText}`);
@@ -16,7 +13,6 @@ async function downloadFile(url, destPath) {
   return destPath;
 }
 
-// ✅ Format text for FFmpeg
 function escapeFFmpegText(text) {
   const clean = (text || "")
     .replace(/\\/g, "\\\\")
@@ -29,13 +25,17 @@ function escapeFFmpegText(text) {
   return clean.replace(/(.{1,50})(\s|$)/g, "$1\\n").trim();
 }
 
-// 📽️ Main handler
-export async function POST(req) {
+// ✅ Main handler for pages/api
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    const { imageList, audioFileUrl, script } = await req.json();
+    const { imageList, audioFileUrl, script } = req.body;
 
     if (!Array.isArray(imageList) || !audioFileUrl || !Array.isArray(script)) {
-      return NextResponse.json({ error: "Invalid input data" }, { status: 400 });
+      return res.status(400).json({ error: "Invalid input data" });
     }
 
     const tempDir = path.join(os.tmpdir(), uuidv4());
@@ -109,12 +109,12 @@ export async function POST(req) {
 
     await fs.rm(tempDir, { recursive: true, force: true });
 
-    return NextResponse.json({ result: `data:video/mp4;base64,${base64}` });
+    res.status(200).json({ result: `data:video/mp4;base64,${base64}` });
   } catch (error) {
     console.error("Export error:", error);
-    return NextResponse.json(
-      { error: "Export failed", details: error.message },
-      { status: 500 }
-    );
+    res.status(500).json({
+      error: "Export failed",
+      details: error.message,
+    });
   }
 }

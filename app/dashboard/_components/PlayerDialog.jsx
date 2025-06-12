@@ -63,7 +63,8 @@ function PlayerDialog({ playVideo, videoId }) {
         script: videoData?.script || [],
       };
 
-      const response = await fetch("/api/export-video", {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const response = await fetch(`${baseURL}/export-video`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -77,24 +78,11 @@ function PlayerDialog({ playVideo, videoId }) {
       const data = await response.json();
       const base64Data = data?.result;
 
-      if (!base64Data?.startsWith("data:video/mp4;base64,")) {
-        throw new Error("Invalid video data format received");
+      if (!/^data:video\/mp4;base64,/.test(base64Data)) {
+        throw new Error("Invalid video format");
       }
 
-      const base64String = base64Data.split(",")[1];
-      const byteCharacters = atob(base64String);
-      const byteArrays = [];
-
-      for (let i = 0; i < byteCharacters.length; i += 1024) {
-        const slice = byteCharacters.slice(i, i + 1024);
-        const byteNumbers = new Array(slice.length);
-        for (let j = 0; j < slice.length; j++) {
-          byteNumbers[j] = slice.charCodeAt(j);
-        }
-        byteArrays.push(new Uint8Array(byteNumbers));
-      }
-
-      const blob = new Blob(byteArrays, { type: "video/mp4" });
+      const blob = await (await fetch(base64Data)).blob();
       const url = window.URL.createObjectURL(blob);
 
       const link = document.createElement("a");
